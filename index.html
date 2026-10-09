@@ -564,13 +564,19 @@ var _wdr=getWDR();
 getStoreVariants(_sw,S.punto).forEach(function(v){
 if(pk==='weekly'){
 r=mergeM(r,(_sw[v]||{})[k]||null);
+} else if(pk==='daily'){
+// Use store_daily directly for real per-day data
+var _sd=c.store_daily||{};
+getStoreVariants(_sd,S.punto).forEach(function(sv){
+var dayRec=(_sd[sv]||{})[k];
+if(dayRec){r=mergeM(r,{total:dayRec.n||0,fin:dayRec.f||0,can:dayRec.c||0,ta:dayRec.ta||0,avg_tc:dayRec.tc,avg_dist:dayRec.di,avg_ticket:dayRec.tk,cum_prom:dayRec.cp,avg_asig:null,avg_rec:null,avg_pto:null,avg_ent:null});}
+});
 } else {
 // Sum store_weekly weeks whose range overlaps key k
 Object.keys(_sw[v]||{}).forEach(function(wk){
 var wr=_wdr[wk]; if(!wr) return;
 var match=false;
-if(pk==='daily') match=(k>=wr.from&&k<=wr.to);
-else if(pk==='monthly') match=(wr.from.slice(0,7)===k||wr.to.slice(0,7)===k);
+if(pk==='monthly') match=(wr.from.slice(0,7)===k||wr.to.slice(0,7)===k);
 else if(pk==='quinc'){
 var checkQ=function(date){var d=parseInt(date.slice(8,10));return date.slice(0,7)+'-Q'+(d<16?'1':'2');};
 match=(checkQ(wr.from)===k||checkQ(wr.to)===k);
@@ -616,15 +622,27 @@ if(useExactDate&&!seg&&!iv){
 if(S.punto){
 
 getCubes().filter(Boolean).forEach(c=>{
+if(S.period==='daily'){
+// Use store_daily for accurate per-day KPI totals
+var _sd=c.store_daily||{};
+getStoreVariants(_sd,S.punto).forEach(function(sv){
+Object.keys(_sd[sv]||{}).forEach(function(date){
+if(date>=S.from&&date<=S.to){
+var dr=_sd[sv][date];
+total=mergeM(total,{total:dr.n||0,fin:dr.f||0,can:dr.c||0,ta:dr.ta||0,avg_tc:dr.tc,avg_dist:dr.di,avg_ticket:dr.tk,cum_prom:dr.cp,avg_asig:null,avg_rec:null,avg_pto:null,avg_ent:null});
+}
+});
+});
+} else {
 var _sw=c.store_weekly||{};
 var _wdr=getWDR();
 getStoreVariants(_sw,S.punto).forEach(function(v){
 Object.keys(_sw[v]||{}).forEach(function(wk){
 var wr=_wdr[wk]; if(!wr) return;
-// include week if it overlaps [S.from, S.to]
 if(wr.from<=S.to&&wr.to>=S.from) total=mergeM(total,(_sw[v]||{})[wk]||null);
 });
 });
+}
 });
 } else if(S.ciudad){
 
