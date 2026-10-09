@@ -864,10 +864,17 @@ mkChart('ops-ch-tc',{type:'line',data:{labels:lbls,datasets:[
 })();
 
 
-mkChart('ops-ch-dist',{type:'line',data:{labels:lbls,datasets:[
-{label:'Km prom.',data:vs.map(function(v){return v.avg_dist;}),borderColor:'#10B981',backgroundColor:'#10B98122',borderWidth:2,fill:true,tension:0.4,pointRadius:3,
-datalabels:{display:'auto',anchor:'top',align:'top',color:'#10B981',font:{size:8,weight:'700'},formatter:function(v){return v!=null?v.toFixed(1)+' km':null;}}},
-]},options:OPT({scales:{x:{ticks:{color:'#718096',font:{size:9},autoSkip:false,maxRotation:45}},y:{ticks:{color:'#718096',font:{size:9},callback:function(v){return v+' km';}}}},layout:{padding:{top:16}}})});
+var _distSegRanges={s1a:[0,3],s1b:[3,5],s2:[5,7],s3:[7,10],s4:[10,999]};
+var _distSegLabels={s1a:'0–3 km',s1b:'3–5 km',s2:'5–7 km',s3:'7–10 km',s4:'+10 km'};
+var _dsr=opsSeg&&opsSeg!=='all'?_distSegRanges[opsSeg]:null;
+var _distDs=[{label:'Km prom.',data:vs.map(function(v){return v.avg_dist;}),borderColor:'#10B981',backgroundColor:'#10B98122',borderWidth:2,fill:true,tension:0.4,pointRadius:3,
+datalabels:{display:'auto',anchor:'top',align:'top',color:'#10B981',font:{size:8,weight:'700'},formatter:function(v){return v!=null?v.toFixed(1)+' km':null;}}}];
+if(_dsr){
+var _rMin=_dsr[0],_rMax=_dsr[1]<900?_dsr[1]:null;
+_distDs.push({label:'Rango mín ('+_distSegLabels[opsSeg]+')',data:vs.map(function(){return _rMin;}),borderColor:'#94a3b8',borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,datalabels:{display:false}});
+if(_rMax)_distDs.push({label:'Rango máx',data:vs.map(function(){return _rMax;}),borderColor:'#94a3b8',borderWidth:1,borderDash:[4,3],pointRadius:0,fill:false,datalabels:{display:false}});
+}
+mkChart('ops-ch-dist',{type:'line',data:{labels:lbls,datasets:_distDs},options:OPT({scales:{x:{ticks:{color:'#718096',font:{size:9},autoSkip:false,maxRotation:45}},y:{ticks:{color:'#718096',font:{size:9},callback:function(v){return v+' km';}}}},layout:{padding:{top:16}}})});
 
 
 mkChart('ops-ch-ticket',{type:'line',data:{labels:lbls,datasets:[
