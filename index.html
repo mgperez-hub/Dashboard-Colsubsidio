@@ -318,7 +318,7 @@ outline:none;border-color:#0066CC;box-shadow:0 0 0 3px rgba(0,102,204,.15);
 </div>
 <div class="g2">
 <div class="card"><h3 style="border-bottom-color:#8B5CF6">📦 Valor Declarado Promedio (COP)</h3><div class="cleg"><span><div class="cdot" style="background:#8B5CF6"></div>Valor declarado prom.</span></div><canvas id="ops-ch-vd"></canvas></div>
-<div class="card" style="visibility:hidden"></div>
+<div class="card"><h3 style="border-bottom-color:#10B981">📏 Servicios por Distancia</h3><div id="ops-dist-bars"></div></div>
 </div>
 <div class="g2">
 <div class="card"><h3 style="border-bottom-color:#0066CC">📊 Composición Tiempo por Ciudad (min)</h3><canvas id="ops-ch-comp"></canvas></div>
@@ -1075,6 +1075,7 @@ plugins:{legend:{display:false},datalabels:{display:false}},
 scales:{x:{ticks:{color:'#718096',font:{size:9},autoSkip:false,maxRotation:45}},y:{ticks:{color:'#718096',font:{size:9}}}}}});
 }
 renderTimeBars();
+renderDistBars();
 renderStoreTable();
 }
 
@@ -1277,7 +1278,7 @@ var el=document.getElementById('ops-time-bars'); if(!el) return;
 var cubes=getCubes(), wks=activeWeeks(), ac=ACCENT[opsCanalActive]||'#003580';
 var SEGS=[{key:'s1a',label:'0\u20133 km',promesa:35},{key:'s1b',label:'4\u20135 km',promesa:45},
 {key:'s2',label:'6\u20137 km',promesa:50},{key:'s3',label:'8\u201310 km',promesa:65},
-{key:'s4',label:'+10 km',promesa:110}];
+{key:'s4',label:'11+ km',promesa:110}];
 var allTotal=null;
 var _activePtos=S.puntos&&S.puntos.length?S.puntos:(S.punto?[S.punto]:[]);
 wks.forEach(function(w){cubes.forEach(function(c){
@@ -1331,6 +1332,73 @@ h+='<div style="margin-bottom:10px">'
 +'<div style="height:100%;width:'+w2+'%;background:'+pc(pct)+';border-radius:6px;transition:width .4s"></div></div></div>';
 });
 if(!h) h='<p style="color:#718096;font-size:11px">Sin datos para el per\u00edodo seleccionado</p>';
+el.innerHTML=h;
+}
+
+function renderDistBars(){
+var el=document.getElementById('ops-dist-bars'); if(!el) return;
+var cubes=getCubes(), wks=activeWeeks();
+var _activePtos=S.puntos&&S.puntos.length?S.puntos:(S.punto?[S.punto]:[]);
+var SEGS2=[
+  {key:'s1a',label:'0–3 km',color:'#0066CC'},
+  {key:'s1b',label:'4–5 km',color:'#3B82F6'},
+  {key:'s2', label:'6–7 km',color:'#10B981'},
+  {key:'s3', label:'8–10 km',color:'#F59E0B'},
+  {key:'s4', label:'+10 km',   color:'#E91E8C'},
+];
+var grandTotal=0;
+var segTotals={};
+SEGS2.forEach(function(s){ segTotals[s.key]=0; });
+wks.forEach(function(w){
+  cubes.forEach(function(c){
+    if(_activePtos.length){
+      var sw=c.store_weekly||{};
+      _activePtos.forEach(function(p){
+        getStoreVariants(sw,p).forEach(function(v){
+          var r=(sw[v]||{})[w]; if(r) grandTotal+=(r.total||0);
+        });
+      });
+    } else if(S.ciudad){
+      var r2=(c.city_weekly||{})[S.ciudad]&&(c.city_weekly||{})[S.ciudad][w]; if(r2) grandTotal+=(r2.total||0);
+    } else {
+      var r3=(c.weekly||{})[w]; if(r3) grandTotal+=(r3.total||0);
+    }
+    SEGS2.forEach(function(seg){
+      var cnt=0;
+      if(_activePtos.length){
+        var ssw=(c.seg_store_weekly||{})[seg.key]||{};
+        _activePtos.forEach(function(p){
+          getStoreVariants(ssw,p).forEach(function(v){
+            var r=(ssw[v]||{})[w]; if(r) cnt+=(r.total||0);
+          });
+        });
+      } else if(S.ciudad){
+        var scw=(c.seg_city_weekly||{})[seg.key]||{};
+        var r2=(scw[S.ciudad]||{})[w]; if(r2) cnt+=(r2.total||0);
+      } else {
+        var r3=(c.seg_weekly||{})[seg.key]&&(c.seg_weekly||{})[seg.key][w]; if(r3) cnt+=(r3.total||0);
+      }
+      segTotals[seg.key]+=cnt;
+    });
+  });
+});
+var maxCount=Math.max(1,Math.max.apply(null,SEGS2.map(function(s){return segTotals[s.key];})));
+var h='';
+SEGS2.forEach(function(seg,i){
+  var cnt=segTotals[seg.key];
+  var pct=grandTotal>0?Math.round(cnt/grandTotal*100):0;
+  var barW=Math.round(cnt/maxCount*100);
+  var bg=i%2===0?'#FFFFFF':'#F7FAFF';
+  h+='<div style="margin-bottom:10px;padding:6px 8px;background:'+bg+';border-radius:6px">';
+  h+='<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
+  h+='<span style="font-size:11px;font-weight:700;color:#003580">'+seg.label+'</span>';
+  h+='<span style="font-size:11px;font-weight:800;color:'+seg.color+'">'+(cnt||0).toLocaleString('es-CO')+' <span style="font-size:10px;color:#718096;font-weight:500">('+pct+'%)</span></span>';
+  h+='</div>';
+  h+='<div style="background:#e2e8f0;border-radius:6px;height:10px;overflow:hidden">';
+  h+='<div style="height:100%;width:'+barW+'%;background:'+seg.color+';border-radius:6px;transition:width .4s"></div>';
+  h+='</div></div>';
+});
+if(!grandTotal){h='<div style="text-align:center;color:#718096;padding:20px;font-size:11px">Sin datos</div>';}
 el.innerHTML=h;
 }
 
