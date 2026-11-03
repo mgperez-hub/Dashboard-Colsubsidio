@@ -447,29 +447,6 @@ return base.filter(Boolean).map(function(c){
   proxy.store_weekly=finLeaf(newSW,2);
   proxy.store_city=c.req_store_city&&c.req_store_city[reqs[0]]||c.store_city;
   proxy.puntos=Object.keys(newSW).sort();
-  // Reconstruir seg_weekly/seg_city_weekly/seg_store_weekly proporcionales al filtro
-  // Para no perder el filtro de distancia, propagamos las seg_* del cubo original
-  // filtradas a los puntos activos
-  var activePtosMap={}; proxy.puntos.forEach(function(p){activePtosMap[p]=true;});
-  // seg_store_weekly: solo los puntos del solicitante
-  if(c.seg_store_weekly){
-    var newSgS={};
-    Object.keys(c.seg_store_weekly).forEach(function(sg){
-      var byPto=c.seg_store_weekly[sg]||{};newSgS[sg]={};
-      Object.keys(byPto).forEach(function(p){
-        var pm=p.match(/^([A-Za-z]\d+)/i);var code=pm?pm[1].toUpperCase():p.toUpperCase();
-        var match=proxy.puntos.some(function(ap){var am=ap.match(/^([A-Za-z]\d+)/i);return (am?am[1].toUpperCase():ap.toUpperCase())===code;});
-        if(match) newSgS[sg][p]=byPto[p];
-      });
-    });
-    proxy.seg_store_weekly=newSgS;
-    // seg_weekly: suma de seg_store_weekly sobre semanas
-    var newSgW={};
-    Object.keys(newSgS).forEach(function(sg){Object.keys(newSgS[sg]).forEach(function(p){Object.keys(newSgS[sg][p]||{}).forEach(function(wk){if(!newSgW[sg])newSgW[sg]={};if(!newSgW[sg][wk]){newSgW[sg][wk]=newSgS[sg][p][wk].slice();}else{var v=newSgS[sg][p][wk];for(var j=0;j<v.length;j++)newSgW[sg][wk][j]=(newSgW[sg][wk][j]||0)+(v[j]||0);}});});});
-    proxy.seg_weekly=newSgW;
-    // seg_city_weekly desde c.seg_city_weekly (ciudad ya filtra por sí sola)
-    proxy.seg_city_weekly=c.seg_city_weekly;
-  }
   // daily/monthly aproximados desde weekly (sin breakdown diario por solicitante)
   return proxy;
 });
@@ -1371,16 +1348,9 @@ noRes.textContent='Sin resultados para "'+q+'"';
 
 /* ═══ Multi-select Solicitante ═══ */
 function _buildReqOptions(){
-  // Leer siempre de los cubos base (sin proxy de solicitante) para mostrar todos los disponibles
-  var base;
-  if(opsCanalActive==='pres')        base=[window.CUBE_OMS];
-  else if(opsCanalActive==='nopres') base=[window.CUBE_MOS];
-  else if(opsCanalActive==='conv')   base=[window.CUBE_CON];
-  else base=[window.CUBE_OMS,window.CUBE_MOS,window.CUBE_CON];
-  base=base.filter(Boolean);
-  var ciudad=S.ciudad||'', puntos=S.puntos||[];
+  var cubes=getCubes(), ciudad=S.ciudad||'', puntos=S.puntos||[];
   var raw=new Set();
-  base.forEach(function(c){
+  cubes.forEach(function(c){
     var rw=c.req_weekly||{};
     Object.keys(rw).forEach(function(rq){
       if(ciudad){
@@ -2053,15 +2023,8 @@ function hxdFilterTiendas(q){
 /* ── Solicitante en HxD ─────────────────────────── */
 function _hxdPopReqs(){
   var list=document.getElementById('hxd-req-list'); if(!list) return;
-  // Leer siempre de los cubos base (sin filtro de reqs) para poblar el dropdown
-  var baseCubes=[];
-  if(_hxd.canal==='pres')        baseCubes=[window.CUBE_OMS];
-  else if(_hxd.canal==='nopres') baseCubes=[window.CUBE_MOS];
-  else if(_hxd.canal==='conv')   baseCubes=[window.CUBE_CON];
-  else baseCubes=[window.CUBE_OMS,window.CUBE_MOS,window.CUBE_CON];
-  baseCubes=baseCubes.filter(Boolean);
-  var codes={};
-  baseCubes.forEach(function(c){Object.keys(c.req_weekly||{}).forEach(function(rq){codes[rq]=true;});});
+  var cubes=_hxdCubes(), codes={};
+  cubes.forEach(function(c){Object.keys(c.req_weekly||{}).forEach(function(rq){codes[rq]=true;});});
   var sorted=Object.keys(codes).sort(function(a,b){return a.localeCompare(b,'es');});
   var html='<label style="display:flex;align-items:center;gap:6px;padding:5px 10px;cursor:pointer;font-size:11px;color:#003580" onclick="hxdReqAll(this)"><input type="checkbox" id="hxd-req-all" checked style="accent-color:#0066CC"> Todos los solicitantes</label>';
   sorted.forEach(function(rq){
