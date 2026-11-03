@@ -1673,10 +1673,26 @@ var SEGS2=[
 var grandTotal=0;
 var segTotals={};
 SEGS2.forEach(function(s){ segTotals[s.key]=0; });
-var _distFiltExact=opsSeg&&opsSeg!=='all'?opsSeg:null;
 var useExact=(S.period==='monthly'||S.period==='quinc'||S.period==='daily');
 if(useExact){
-  // grandTotal: si hay filtro distancia, usar solo ese seg desde seg_weekly
+  cubes.forEach(function(c){
+    if(_activePtos.length){
+      _activePtos.forEach(function(p){
+        var _sd=c.store_daily||{};
+        getStoreVariants(_sd,p).forEach(function(v){
+          Object.keys(_sd[v]||{}).forEach(function(date){
+            if(date>=S.from&&date<=S.to) grandTotal+=(_sd[v][date].n||_sd[v][date].total||0);
+          });
+        });
+      });
+    } else if(S.ciudad){
+      var cd=(c.city_daily||{})[S.ciudad]||{};
+      Object.keys(cd).forEach(function(date){ if(date>=S.from&&date<=S.to) grandTotal+=(cd[date].total||0); });
+    } else {
+      var dl=c.daily||{};
+      Object.keys(dl).forEach(function(date){ if(date>=S.from&&date<=S.to) grandTotal+=(dl[date].total||0); });
+    }
+  });
   var weeklyGrand=0, weeklySegs={};
   SEGS2.forEach(function(s){ weeklySegs[s.key]=0; });
   wks.forEach(function(w){
@@ -1712,52 +1728,26 @@ if(useExact){
       });
     });
   });
-  // Calcular grandTotal desde daily (siempre total general para escalar)
-  var _rawGrand=0;
-  cubes.forEach(function(c){
-    if(_activePtos.length){
-      _activePtos.forEach(function(p){
-        var _sd=c.store_daily||{};
-        getStoreVariants(_sd,p).forEach(function(v){
-          Object.keys(_sd[v]||{}).forEach(function(date){
-            if(date>=S.from&&date<=S.to) _rawGrand+=(_sd[v][date].n||_sd[v][date].total||0);
-          });
-        });
-      });
-    } else if(S.ciudad){
-      var cd=(c.city_daily||{})[S.ciudad]||{};
-      Object.keys(cd).forEach(function(date){ if(date>=S.from&&date<=S.to) _rawGrand+=(cd[date].total||0); });
-    } else {
-      var dl=c.daily||{};
-      Object.keys(dl).forEach(function(date){ if(date>=S.from&&date<=S.to) _rawGrand+=(dl[date].total||0); });
-    }
-  });
   if(weeklyGrand>0){
-    SEGS2.forEach(function(seg){ segTotals[seg.key]=Math.round(weeklySegs[seg.key]/weeklyGrand*_rawGrand); });
-    var _segSum2=SEGS2.reduce(function(a,s){return a+segTotals[s.key];},0);
-    var diff=_rawGrand-_segSum2;
+    SEGS2.forEach(function(seg){ segTotals[seg.key]=Math.round(weeklySegs[seg.key]/weeklyGrand*grandTotal); });
+    var segSum=SEGS2.reduce(function(a,s){return a+segTotals[s.key];},0);
+    var diff=grandTotal-segSum;
     if(diff!==0){ var maxSeg=SEGS2.reduce(function(a,s){return segTotals[s.key]>segTotals[a.key]?s:a;},SEGS2[0]); segTotals[maxSeg.key]+=diff; }
   }
 } else {
-var _activeSeg=opsSeg&&opsSeg!=='all'?opsSeg:null;
 wks.forEach(function(w){
   cubes.forEach(function(c){
     if(_activePtos.length){
       var sw=c.store_weekly||{};
       _activePtos.forEach(function(p){
-        if(_activeSeg){
-          var ssw=(c.seg_store_weekly||{})[_activeSeg]||{};
-          getStoreVariants(ssw,p).forEach(function(v){var r=(ssw[v]||{})[w];if(r)grandTotal+=(r.total||0);});
-        } else {
-          getStoreVariants(sw,p).forEach(function(v){var r=(sw[v]||{})[w];if(r)grandTotal+=(r.total||0);});
-        }
+        getStoreVariants(sw,p).forEach(function(v){
+          var r=(sw[v]||{})[w]; if(r) grandTotal+=(r.total||0);
+        });
       });
     } else if(S.ciudad){
-      if(_activeSeg){var scw=(c.seg_city_weekly||{})[_activeSeg]||{};var rsc=(scw[S.ciudad]||{})[w];if(rsc)grandTotal+=(rsc.total||0);}
-      else{var r2=(c.city_weekly||{})[S.ciudad]&&(c.city_weekly||{})[S.ciudad][w];if(r2)grandTotal+=(r2.total||0);}
+      var r2=(c.city_weekly||{})[S.ciudad]&&(c.city_weekly||{})[S.ciudad][w]; if(r2) grandTotal+=(r2.total||0);
     } else {
-      if(_activeSeg){var rsw=(c.seg_weekly||{})[_activeSeg];var rsw2=rsw&&rsw[w];if(rsw2)grandTotal+=(rsw2.total||0);}
-      else{var r3=(c.weekly||{})[w];if(r3)grandTotal+=(r3.total||0);}
+      var r3=(c.weekly||{})[w]; if(r3) grandTotal+=(r3.total||0);
     }
     SEGS2.forEach(function(seg){
       var cnt=0;
@@ -1779,29 +1769,21 @@ wks.forEach(function(w){
   });
 });
 }
-// Cuando hay filtro de distancia, grandTotal ya es el del segmento activo;
-// para los % usamos la suma de todos los segmentos como base
-var _distFilter=opsSeg&&opsSeg!=='all'?opsSeg:null;
-var segSum=SEGS2.reduce(function(a,s){return a+segTotals[s.key];},0);
-var pctBase=_distFilter?segSum:grandTotal; // base para porcentajes
 var maxCount=Math.max(1,Math.max.apply(null,SEGS2.map(function(s){return segTotals[s.key];})));
 var h='';
 /* Total header row */
 if(grandTotal>0){
-  var headerLabel=_distFilter?(SEGS2.find(function(s){return s.key===_distFilter;})||{label:'Segmento'}).label+' — servicios':'📦 Total servicios';
   h+='<div style="margin-bottom:12px;padding:7px 10px;background:#EFF6FF;border-radius:7px;border-left:3px solid #003580;display:flex;justify-content:space-between;align-items:center">';
-  h+='<span style="font-size:11px;font-weight:700;color:#003580">'+headerLabel+'</span>';
+  h+='<span style="font-size:11px;font-weight:700;color:#003580">📦 Total servicios</span>';
   h+='<span style="font-size:13px;font-weight:800;color:#003580">'+grandTotal.toLocaleString('es-CO')+'</span>';
   h+='</div>';
 }
 SEGS2.forEach(function(seg,i){
   var cnt=segTotals[seg.key];
-  var pct=pctBase>0?Math.round(cnt/pctBase*100):0;
+  var pct=grandTotal>0?Math.round(cnt/grandTotal*100):0;
   var barW=Math.round(cnt/maxCount*100);
-  var isActive=_distFilter&&seg.key===_distFilter;
-  var bg=isActive?'#EFF6FF':(i%2===0?'#FFFFFF':'#F7FAFF');
-  var border=isActive?'border-left:3px solid '+seg.color+';':'';
-  h+='<div style="margin-bottom:10px;padding:6px 8px;background:'+bg+';border-radius:6px;'+border+'">';
+  var bg=i%2===0?'#FFFFFF':'#F7FAFF';
+  h+='<div style="margin-bottom:10px;padding:6px 8px;background:'+bg+';border-radius:6px">';
   h+='<div style="display:flex;justify-content:space-between;margin-bottom:4px">';
   h+='<span style="font-size:11px;font-weight:700;color:#003580">'+seg.label+'</span>';
   h+='<span style="font-size:11px;font-weight:800;color:'+seg.color+'">'+(cnt||0).toLocaleString('es-CO')+' <span style="font-size:10px;color:#718096;font-weight:500">('+pct+'%)</span></span>';
